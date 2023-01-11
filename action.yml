@@ -17,6 +17,15 @@ inputs:
   token:
     description: 'pass secrets.GITHUB_TOKEN'
     required: true
+  tableCount:
+    description: 'table count required to decide number of tables required to show summary'
+    required: true
+  tableConfigPath:
+    description: 'Table config for the title of the issue table summary'
+    required: true
+  remoteRepoToken:
+    description: 'Table config for the title of the issue table summary'
+    required: true
 runs:
   using: 'node12'
   main: 'dist/index.js'

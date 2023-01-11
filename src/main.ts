@@ -9,7 +9,9 @@ async function main(): Promise<void> {
             title: core.getInput('title'),
             configPath: core.getInput('configPath'),
             outputPath: core.getInput('outputPath'),
+            tableConfigPath: core.getInput('tableConfigPath'),
             octokit: new github.GitHub(core.getInput('token')),
+            octokitRemoteRepo: new github.GitHub(core.getInput('remoteRepoToken')),
             repoContext: { ...github.context.repo }
         });
     } catch (error) {

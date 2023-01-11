@@ -1,18 +1,21 @@
-import type { Issue, RepoContext, Section } from './types';
+import type { Issue, RepoContext, Section, tableConfig } from './types';
 import {arrayToTable} from "./convertotable"
 import { getStatus } from './status';
 
+export function* generateSummary(title: string, sections: Section[] [], tableData: tableConfig[]) {
 
-
-
-export function* generateSummary(title: string, sections: Section[], repoContext:RepoContext) {
     yield h3(title);
-    yield p("The table below shows data for last few months,There might we some error(approximate data) as we are not tracing issues which are very old as we can not go back in history too much and we make a since query")
-    yield h3('Summary');
-    yield '| Section Title | description | Labels | Threshold | Monthly Count | Totals Open Now | Status|';
-    yield '| :--- |  :----: | :----: |  :----:  |  :----:  |  :----: | :----: ';
-    for (const section of sections) {
-        yield* sectionSummary(section, repoContext);
+    yield p("The table below shows data for the last few weeks and open count since Oct'22 ,There might be some error(approximate data) as we are not tracing issues which are very old as we can not go back in history too much and we make a since query")
+
+    for(var i = 0; i < sections.length; i++) {
+        yield h3(tableData[i].tableTitle);
+
+        yield '| Section Title | description | Labels | Threshold | Weekly Count | Totals Open Now since Oct 2022 | Status|';
+        yield '| :--- |  :----: | :----: |  :----:  |  :----:  |  :----: | :----: ';
+
+        for (const section of sections[i]) {
+            yield* sectionSummary(section);
+        }
     }
 }
 
@@ -42,42 +45,41 @@ function createtableMonthly(sections:any){
 
 } 
 
-function* sectionSummary(section: Section, repoContext:RepoContext) {
+function* sectionSummary(section: Section) {
     // When generating header links, the red status needs some additional characters at the front because of the emoji it uses.
     // However GitHub-Flavored Markdown generates IDs for its headings, the other statuses aren't affected and just drop theirs.
     // It probably has to do with the Unicode ranges.
     const redStatusIdFragment = '%EF%B8%8F';
     
-    let issueQuery = issuesQuery(repoContext, section.labels, section.excludeLabels || [])
+    let issueQuery = issuesQuery(section.repo, section.owner, section.labels, section.excludeLabels || [])
 
     let sectionAnchor = '#'
         + ('❤️🥵')
         + `-${hyphenate(section.section)}-query`;
      
     sectionAnchor = issueQuery
-    let pervious_count_open = 0;
-    let pervious_count_close = 0
+    let total_count_open = 0;
+  
 
     let data_list = []
     for( const sect of section.issues){
-        data_list.push({ month: sect.month_text , open_count: (sect.issues_open.length - pervious_count_open), close_count:(sect.issues_closed.length - pervious_count_close) })
+        data_list.push({ week: sect.week_text , issues_open_count: (sect.issues_open_count), issues_close_count: (sect.issues_close_count) })
 
-        pervious_count_close = sect.issues_closed.length
-        pervious_count_open = sect.issues_open.length
+        total_count_open = sect.total_issues_open_length
     }
     let convertedata = createtableMonthly(data_list)
     const section_prefix =  `| ${link(section.section, sectionAnchor)} | ${section.description || "" }   | ${section.labels.map(code).concat((section.excludeLabels || []).map(x => strike(code(x)))).join(', ')} | ${section.threshold}|`
-    let sectionstatus =  getStatus(pervious_count_open, section.threshold)
+    let sectionstatus =  getStatus(total_count_open, section.threshold)
 
-    yield  section_prefix + convertedata + `|`+ `${pervious_count_open}`+ `|` + `${sectionstatus}` + `|`;
+    yield  section_prefix + convertedata + `|`+ `${total_count_open}`+ `|` + `${sectionstatus}` + `|`;
 
     // yield `| ${link(section.section, sectionAnchor)} | ${section.labels.map(code).concat((section.excludeLabels || []).map(x => strike(code(x)))).join(', ')} | ${section.threshold} | ${section.issues.length} | ${section.status} |`;
 }
 
-function* sectionDetails(section: Section, repoContext: RepoContext) {
+function* sectionDetails(section: Section, repo: string, owner: string) {
     const owners = sumIssuesForOwners(section.issues);
 
-    yield h3(`${section.section} ${link('(query)', issuesQuery(repoContext, section.labels, section.excludeLabels || []))}`);
+    yield h3(`${section.section} ${link('(query)', issuesQuery(repo, owner, section.labels, section.excludeLabels || []))}`);
     yield `Total: ${section.issues.length}\n`;
     yield `Threshold: ${section.threshold}\n`;
     yield `Labels: ${section.labels.map(code).concat((section.excludeLabels|| []).map(x => strike(code(x)))).join(', ')}\n`
@@ -88,7 +90,7 @@ function* sectionDetails(section: Section, repoContext: RepoContext) {
     const ownersByIssueCount = Object.keys(owners).sort((a, b) => owners[b] - owners[a]);
     for (const key of ownersByIssueCount) {
         // `key` is the owner's login
-        const queryUrl = issuesQuery(repoContext, section.labels, section.excludeLabels || [], key);
+        const queryUrl = issuesQuery(repo, owner, section.labels, section.excludeLabels || [], key);
         yield `| ${link(key, queryUrl)} | ${owners[key]} |`;
     }
 }
@@ -105,7 +107,7 @@ const strike = (text: string) => `\~${text}\~`;
 const hyphenate = (headerName: string) => headerName.replace(/\s+/g, '-');
 
 /** Construct a URL like `https://github.com/brcrista/summarize-issues-test/issues?q=is%3Aissue+is%3Aopen+label%3Aincident-repair+label%3Ashort-term`. */
-function issuesQuery(repoContext: RepoContext, labels: string[], excludeLabels: string[], assignee?: string) {
+function issuesQuery(repo: string, owner: string, labels: string[], excludeLabels: string[], assignee?: string) {
     labels = makeLabelsUrlSafe(labels);
     excludeLabels = makeLabelsUrlSafe(excludeLabels);
 
@@ -124,7 +126,7 @@ function issuesQuery(repoContext: RepoContext, labels: string[], excludeLabels: 
 
     // The `+` signs should not be encoded for the query to work.
     const queryString = queryInputs.map(encodeURIComponent).join('+');
-    return `https://github.com/${repoContext.owner}/${repoContext.repo}/issues?q=${queryString}`;
+    return `https://github.com/${owner}/${repo}/issues?q=${queryString}`;
 }
 
 function makeLabelsUrlSafe(labels: string[]) {

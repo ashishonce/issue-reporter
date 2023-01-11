@@ -14,8 +14,16 @@ export interface ConfigSection {
     excludeLabels?: string[],
     threshold: number,
     months?:number,
-    since?: string, 
-    description?:string
+    tableIndex?:number,
+    since?: string,
+    description?:string,
+    repo?:string,
+    owner?:string
+}
+
+export interface tableConfig {
+
+    "tableTitle" : string
 }
 
 // What comes out of the config file plus whatever else we need to write the report
