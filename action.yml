@@ -15,7 +15,7 @@ inputs:
     description: 'relative path from the repo root to write the report file'
     required: true
   token:
-    description: 'pass secrets.GITHUB_TOKEN'
+    description: 'repo token'
     required: true
   tableCount:
     description: 'table count required to decide number of tables required to show summary'
@@ -24,7 +24,7 @@ inputs:
     description: 'Table config for the title of the issue table summary'
     required: true
   remoteRepoToken:
-    description: 'Table config for the title of the issue table summary'
+    description: 'PAT to access the remote repo'
     required: true
 runs:
   using: 'node12'
